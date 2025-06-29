@@ -17,13 +17,17 @@ export default function HomePage() {
   const [result, setResult] = useState<AnalyzeResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [provider, setProvider] = useState<'ollama' | 'openai'>('ollama');
+  const [openaiApiKey, setOpenaiApiKey] = useState<string>('');
 
-  const handleSubmit = async (url: string) => {
+  const handleSubmit = async (url: string, prov: string, apiKey?: string) => {
+    setProvider(prov as 'ollama' | 'openai');
+    if (prov === 'openai' && apiKey) setOpenaiApiKey(apiKey);
     setLoading(true);
     setError("");
     setResult(null);
     try {
-      const data = await analyzeVideo(url);
+      const data = await analyzeVideo(url, prov, apiKey);
       setResult(data);
     } catch (e: any) {
       setError(e.message || "Something went wrong");
@@ -38,18 +42,18 @@ export default function HomePage() {
       <Box sx={{
         width: '100%',
         py: 5,
-        background: 'linear-gradient(90deg, #a18cd1 0%, #fbc2eb 100%)',
+        background: 'linear-gradient(90deg, #4f8a8b 0%, #cfd9df 100%)',
         mb: 4,
         boxShadow: 2,
       }}>
         <Container maxWidth="md">
           <Stack direction="row" alignItems="center" spacing={2} justifyContent="center">
-            <img src="https://www.svgrepo.com/show/349502/youtube.svg" alt="YouTube" width={40} height={40} />
-            <Typography variant="h3" fontWeight={700} color="#4b2994">
+            <img src="/youtube.svg" alt="YouTube" width={40} height={40} />
+            <Typography variant="h3" fontWeight={700} color="#22313f">
               YouTube Video Analyzer <span role="img" aria-label="sparkles">✨</span>
             </Typography>
           </Stack>
-          <Typography variant="h6" align="center" color="#4b2994" sx={{ mt: 1 }}>
+          <Typography variant="h6" align="center" color="#22313f" sx={{ mt: 1 }}>
             Extract transcripts, get AI summaries, and generate engaging tweets
           </Typography>
           <Stack direction="row" spacing={2} justifyContent="center" alignItems="center" sx={{ mt: 2 }}>
@@ -70,7 +74,7 @@ export default function HomePage() {
             </Typography>
             <Stack direction="row" spacing={2}>
               {EXAMPLES.map(ex => (
-                <Link key={ex.url} href="#" underline="hover" onClick={() => handleSubmit(ex.url)}>
+                <Link key={ex.url} href="#" underline="hover" onClick={() => handleSubmit(ex.url, provider, provider === 'openai' ? openaiApiKey : undefined)}>
                   {ex.label}
                 </Link>
               ))}

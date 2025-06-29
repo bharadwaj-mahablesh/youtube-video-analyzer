@@ -28,30 +28,37 @@ async def analyze_video(request: AnalyzeRequest):
         if not transcript:
             raise HTTPException(status_code=404, detail="Transcript not found.")
 
+        provider = getattr(request, 'provider', 'ollama')
+        openai_api_key = getattr(request, 'openai_api_key', None)
+
+        # Truncate transcript for OpenAI to avoid context length errors
+        max_chars = 12000 if provider == 'openai' else None
+        transcript_to_use = transcript[:max_chars] if max_chars else transcript
+
         # Prompts for each section (direct, no meta-phrases)
         summary_prompt = (
             "Summarize the following YouTube video transcript in 2-3 sentences. Do not preface with any phrase, just give the summary.\n"
-            f"Transcript: {transcript}"
+            f"Transcript: {transcript_to_use}"
         )
         takeaways_prompt = (
             "List 5 detailed key takeaways from the following YouTube video transcript. Do not preface with any phrase, just list them as bullet points.\n"
-            f"Transcript: {transcript}"
+            f"Transcript: {transcript_to_use}"
         )
         hashtags_prompt = (
             "Generate 5 relevant hashtags for the following YouTube video transcript. Only output the hashtags separated by spaces.\n"
-            f"Transcript: {transcript}"
+            f"Transcript: {transcript_to_use}"
         )
         thread_prompt = (
             "Write a 3-tweet Twitter thread summarizing the following YouTube video transcript. Only output the tweets, one per line, no preface.\n"
-            f"Transcript: {transcript}"
+            f"Transcript: {transcript_to_use}"
         )
 
         # Run LLM calls concurrently
         summary_resp, takeaways_resp, hashtags_resp, thread_resp = await asyncio.gather(
-            get_llm_response(summary_prompt),
-            get_llm_response(takeaways_prompt),
-            get_llm_response(hashtags_prompt),
-            get_llm_response(thread_prompt),
+            LLMService.generate_content(summary_prompt, provider, openai_api_key),
+            LLMService.generate_content(takeaways_prompt, provider, openai_api_key),
+            LLMService.generate_content(hashtags_prompt, provider, openai_api_key),
+            LLMService.generate_content(thread_prompt, provider, openai_api_key),
         )
 
         # Parse and clean responses

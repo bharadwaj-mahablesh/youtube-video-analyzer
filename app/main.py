@@ -1,3 +1,7 @@
+import os
+from dotenv import load_dotenv
+# Explicitly load .env from project root
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '.env'))
 from fastapi import FastAPI
 from app.api.routes import router as api_router
 from fastapi.middleware.cors import CORSMiddleware

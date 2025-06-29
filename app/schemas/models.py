@@ -1,8 +1,10 @@
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 
 class AnalyzeRequest(BaseModel):
     youtube_url: str
+    provider: str = "ollama"  # 'ollama' or 'openai'
+    openai_api_key: Optional[str] = None
 
 class AnalyzeResponse(BaseModel):
     summary: str

@@ -3,3 +3,4 @@ uvicorn
 youtube-transcript-api
 httpx
 # supabase-py  # Uncomment when integrating Supabase 
+openai 
