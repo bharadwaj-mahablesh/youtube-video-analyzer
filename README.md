@@ -9,16 +9,16 @@ AI-powered web app to analyze YouTube videos and generate:
 ## Features
 - Paste any YouTube URL to analyze
 - Fetches transcript using `youtube-transcript-api`
-- Sends transcript to a local LLM (Ollama, e.g., LLaMA3)
+- Sends transcript to OpenAI's API
 - Modular FastAPI backend
 - Beautiful Next.js + Material UI frontend
 - Modern, responsive UI
 - Robust error handling
 
 ## Tech Stack
-- **Backend:** Python, FastAPI, youtube-transcript-api, httpx
+- **Backend:** Python, FastAPI, youtube-transcript-api, httpx, openai
 - **Frontend:** Next.js (React), TypeScript, Material UI
-- **LLM:** Local Ollama (LLaMA3 or compatible)
+- **LLM:** OpenAI API (e.g., GPT-3.5-turbo)
 
 ## Setup
 
@@ -31,7 +31,7 @@ AI-powered web app to analyze YouTube videos and generate:
    ```bash
    uvicorn app.main:app --reload
    ```
-3. Ensure Ollama is running locally (default: `http://localhost:11434`).
+3. Ensure you have set your `OPENAI_API_KEY` in a `.env` file at the project root.
 
 ### Frontend
 1. Go to the frontend directory:

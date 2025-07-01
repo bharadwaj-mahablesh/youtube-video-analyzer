@@ -4,7 +4,7 @@
 An AI-powered application that:
 - Accepts a YouTube video URL
 - Fetches the transcript using `youtube-transcript-api`
-- Sends the transcript to a locally hosted Ollama LLM (e.g., LLaMA3)
+- Sends the transcript to OpenAI's API (e.g., GPT-3.5-turbo)
 - Generates:
   - Video summary
   - 5 key takeaways
@@ -17,7 +17,7 @@ An AI-powered application that:
 ## Tech Stack
 - **Backend**: Python (FastAPI)
 - **Frontend**: Next.js (React) with Material UI
-- **LLM**: Ollama (local, via HTTP API)
+- **LLM**: OpenAI API
 - **Transcript**: `youtube-transcript-api` (Python)
 - **Optional**: Supabase (for future data storage, analytics, or auth)
 
@@ -71,7 +71,7 @@ youtube-analyzer/
 - **main.py**: FastAPI app setup
 - **api/routes.py**: API endpoints (e.g., `/analyze`)
 - **services/transcript.py**: Fetch YouTube transcript
-- **services/llm.py**: Interact with Ollama LLM
+- **services/llm.py**: Interact with OpenAI API
 - **services/content.py**: Format LLM output
 - **schemas/models.py**: Pydantic models
 - **utils/logger.py**: Logging

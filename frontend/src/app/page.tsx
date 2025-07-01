@@ -1,178 +1,368 @@
 "use client";
-import React, { useState } from "react";
-import { Container, Box, CircularProgress, Alert, Typography, Paper, Chip, Stack, Card, CardContent, Divider, Button, Link } from "@mui/material";
+import React, { useState, useEffect } from "react";
+import { Container, Box, CircularProgress, Alert, Typography, Paper, Chip, Stack, Card, CardContent, Button, Link, Grid, Avatar, Menu, MenuItem, ListItemIcon, ListItemText, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from "@mui/material";
 import InputForm from "../components/InputForm";
+import SummaryCard from "../components/SummaryCard";
+import FeedbackForm from "../components/FeedbackForm";
 import TwitterIcon from '@mui/icons-material/Twitter';
 import LightbulbIcon from '@mui/icons-material/Lightbulb';
 import SummarizeIcon from '@mui/icons-material/Summarize';
 import TagIcon from '@mui/icons-material/Tag';
-import { analyzeVideo, AnalyzeResponse } from "../api";
+import { analyzeVideo, submitFeedback, fetchUserInfo, upgradeToPro, AnalyzeResponse, UserInfoResponse } from "../api";
+import UserInfo from "../components/UserInfo";
+import { useUser, SignInButton, SignOutButton, useAuth } from '@clerk/nextjs';
+import YouTubeIcon from '@mui/icons-material/YouTube';
+import { Logout, Upgrade } from '@mui/icons-material';
 
 const EXAMPLES = [
-  { label: "Me at the zoo (First YouTube video)", url: "https://www.youtube.com/watch?v=jNQXAC9IVRw" },
-  { label: "Rick Astley - Never Gonna Give You Up", url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" },
+  { label: "Me at the zoo", url: "https://www.youtube.com/watch?v=jNQXAC9IVRw" },
+  { label: "Rick Astley", url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" },
 ];
 
 export default function HomePage() {
+  const { getToken } = useAuth();
   const [result, setResult] = useState<AnalyzeResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [provider, setProvider] = useState<'ollama' | 'openai'>('ollama');
-  const [openaiApiKey, setOpenaiApiKey] = useState<string>('');
+  const { isSignedIn, user } = useUser();
+  const [userInfo, setUserInfo] = useState<UserInfoResponse>({ tier: 'free', credits_remaining: 0 });
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
 
-  const handleSubmit = async (url: string, prov: string, apiKey?: string) => {
-    setProvider(prov as 'ollama' | 'openai');
-    if (prov === 'openai' && apiKey) setOpenaiApiKey(apiKey);
+
+  useEffect(() => {
+    const getUserCredits = async () => {
+      if (isSignedIn) {
+        try {
+          const token = await getToken();
+          if (token) {
+            const data = await fetchUserInfo(token);
+            setUserInfo(data);
+          }
+        } catch (err) {
+          console.error("Failed to fetch user info:", err);
+        }
+      }
+    };
+    getUserCredits();
+  }, [isSignedIn, getToken]);
+
+  useEffect(() => {
+    if (!isSignedIn) {
+      setAnchorEl(null);
+    }
+  }, [isSignedIn]);
+
+  const handleMenuClick = (event: React.MouseEvent<HTMLElement>) => {
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handleMenuClose = () => {
+    setAnchorEl(null);
+  };
+
+  const handleUpgrade = async () => {
+    try {
+      const token = await getToken();
+      if (!token) throw new Error('Authentication failed');
+      await upgradeToPro(token);
+      const data = await fetchUserInfo(token);
+      setUserInfo(data);
+      setUpgradeModalOpen(false);
+      handleMenuClose();
+    } catch (err: any) {
+      setError(err.message || 'Failed to upgrade');
+    }
+  };
+
+  const handleSubmit = async (url: string) => {
+    if (userInfo.tier === 'free' && userInfo.credits_remaining <= 0) {
+      setUpgradeModalOpen(true);
+      return;
+    }
     setLoading(true);
     setError("");
-    setResult(null);
     try {
-      const data = await analyzeVideo(url, prov, apiKey);
-      setResult(data);
-    } catch (e: any) {
-      setError(e.message || "Something went wrong");
+      const token = await getToken();
+      if (!token) throw new Error('Authentication failed');
+      const result = await analyzeVideo(url, token);
+      setResult(result);
+      if (result.credits_remaining !== undefined) {
+        setUserInfo(prev => ({ ...prev, credits_remaining: result.credits_remaining as number }));
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to analyze video');
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <Box sx={{ minHeight: '100vh', bgcolor: '#f6f7fb' }}>
-      {/* Header */}
-      <Box sx={{
-        width: '100%',
-        py: 5,
-        background: 'linear-gradient(90deg, #4f8a8b 0%, #cfd9df 100%)',
-        mb: 4,
-        boxShadow: 2,
-      }}>
-        <Container maxWidth="md">
-          <Stack direction="row" alignItems="center" spacing={2} justifyContent="center">
-            <img src="/youtube.svg" alt="YouTube" width={40} height={40} />
-            <Typography variant="h3" fontWeight={700} color="#22313f">
-              YouTube Video Analyzer <span role="img" aria-label="sparkles">✨</span>
-            </Typography>
-          </Stack>
-          <Typography variant="h6" align="center" color="#22313f" sx={{ mt: 1 }}>
-            Extract transcripts, get AI summaries, and generate engaging tweets
+  const handleFeedbackSubmit = async (analysisId: string, rating: number, comment: string) => {
+    try {
+        const token = await getToken();
+        if (!token) throw new Error('Authentication failed');
+        await submitFeedback(analysisId, rating, comment, token);
+        alert("Feedback submitted successfully!");
+    } catch (err: any) {
+        setError(err.message || 'Failed to submit feedback');
+    }
+  };
+
+  if (!isSignedIn) {
+    return (
+      <Box
+        sx={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'linear-gradient(135deg, #e0f7fa 0%, #e8eaf6 100%)',
+          py: 4,
+        }}
+      >
+        <Card
+          sx={{
+            p: 5,
+            minWidth: { xs: '90%', sm: 400 },
+            borderRadius: 3,
+            boxShadow: '0px 10px 30px rgba(0, 0, 0, 0.1)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 3,
+            bgcolor: 'white',
+          }}
+        >
+          <YouTubeIcon sx={{ fontSize: 70, color: '#ff0000', mb: 1 }} />
+          <Typography variant="h4" fontWeight={700} color="#3f51b5" sx={{ fontFamily: 'Roboto, sans-serif', textAlign: 'center' }}>
+            YouTube Analyzer
           </Typography>
-          <Stack direction="row" spacing={2} justifyContent="center" alignItems="center" sx={{ mt: 2 }}>
-            <Chip label="⚡ Powered by LLM" color="warning" variant="outlined" />
-            <Chip label="🟢 Live Analysis" color="success" variant="outlined" />
+          <Typography variant="subtitle1" color="text.secondary" sx={{ mb: 2, textAlign: 'center' }}>
+            Unlock video insights with AI-powered summaries and more.
+          </Typography>
+          <SignInButton mode="modal">
+            <Button
+              variant="contained"
+              color="primary"
+              size="large"
+              sx={{
+                borderRadius: 2,
+                fontWeight: 600,
+                fontSize: 16,
+                px: 4,
+                py: 1.5,
+                boxShadow: '0px 4px 15px rgba(63, 81, 181, 0.3)',
+                textTransform: 'none',
+              }}
+            >
+              Sign in to Get Started
+            </Button>
+          </SignInButton>
+        </Card>
+      </Box>
+    );
+  }
+
+  return (
+    <Box sx={{ minHeight: '100vh', bgcolor: '#f0f2f5' }}>
+      <Box
+        sx={{
+          width: '100%',
+          py: 3,
+          background: 'linear-gradient(90deg, #673ab7 0%, #9c27b0 100%)',
+          mb: 4,
+          boxShadow: '0px 4px 20px rgba(0, 0, 0, 0.1)',
+          color: 'white',
+        }}
+      >
+        <Container maxWidth="md">
+          <Stack direction="row" alignItems="center" spacing={2} justifyContent="space-between">
+            <Stack direction="row" alignItems="center" spacing={2}>
+              <img src="/youtube.svg" alt="YouTube" width={35} height={35} />
+              <Typography variant="h5" fontWeight={700}>
+                YouTube Analyzer
+              </Typography>
+            </Stack>
+            <Stack direction="row" alignItems="center" spacing={2}>
+              <Avatar onClick={handleMenuClick} sx={{ cursor: 'pointer' }}>
+                {user?.firstName?.charAt(0)}
+              </Avatar>
+              <Menu
+                anchorEl={anchorEl}
+                open={Boolean(anchorEl)}
+                onClose={handleMenuClose}
+              >
+                {userInfo.tier === 'free' && (
+                  <MenuItem onClick={() => setUpgradeModalOpen(true)}>
+                    <ListItemIcon>
+                      <Upgrade fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText>Upgrade to Pro</ListItemText>
+                  </MenuItem>
+                )}
+                <SignOutButton>
+                  <MenuItem>
+                    <ListItemIcon>
+                      <Logout fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText>Sign Out</ListItemText>
+                  </MenuItem>
+                </SignOutButton>
+              </Menu>
+            </Stack>
           </Stack>
         </Container>
       </Box>
+
       <Container maxWidth="md">
-        <Paper elevation={3} sx={{ p: 4, mb: 3 }}>
+        <Paper elevation={4} sx={{ p: 4, mb: 4, borderRadius: 2 }}>
+          <UserInfo tier={userInfo.tier} credits={userInfo.credits_remaining} />
           <InputForm onSubmit={handleSubmit} loading={loading} />
-          <Box sx={{ mt: 2 }}>
+          <Box sx={{ mt: 3, pt: 2, borderTop: '1px solid #eee' }}>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
               Supports videos with captions • Powered by AI
             </Typography>
             <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
               Try these example videos:
             </Typography>
-            <Stack direction="row" spacing={2}>
+            <Stack direction="row" spacing={2} flexWrap="wrap">
               {EXAMPLES.map(ex => (
-                <Link key={ex.url} href="#" underline="hover" onClick={() => handleSubmit(ex.url, provider, provider === 'openai' ? openaiApiKey : undefined)}>
-                  {ex.label}
+                <Link key={ex.url} href="#" onClick={() => handleSubmit(ex.url)} sx={{ textDecoration: 'none' }}>
+                  <Chip label={ex.label} clickable color="info" variant="outlined" size="small" />
                 </Link>
               ))}
             </Stack>
           </Box>
         </Paper>
+
         {loading && (
           <Box display="flex" justifyContent="center" my={4}>
-            <CircularProgress />
+            <CircularProgress size={60} thickness={4} />
           </Box>
         )}
+
         {error && (
-          <Alert severity="error" sx={{ mb: 2 }}>
+          <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>
             {error}
           </Alert>
         )}
+
         {result && (
           <Box>
-            {/* Sentiment badge placeholder */}
-            <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
-              <Chip label="Sentiment: Positive" color="success" icon={<span>😊</span>} />
-            </Stack>
-            {/* Summary */}
-            <Card sx={{ mb: 3, background: '#f3e8ff', borderLeft: '6px solid #a18cd1' }}>
-              <CardContent>
-                <Stack direction="row" alignItems="center" spacing={1}>
-                  <SummarizeIcon color="primary" />
-                  <Typography variant="h6" fontWeight={600} color="#4b2994">Executive Summary</Typography>
-                </Stack>
-                <Typography variant="body1" sx={{ mt: 1 }}>{result.summary}</Typography>
-              </CardContent>
-            </Card>
-            {/* Key Takeaways */}
-            <Card sx={{ mb: 3, background: '#fffbe6', borderLeft: '6px solid #ffe066' }}>
-              <CardContent>
-                <Stack direction="row" alignItems="center" spacing={1}>
-                  <LightbulbIcon color="warning" />
-                  <Typography variant="h6" fontWeight={600} color="#b59f3b">Key Takeaways</Typography>
-                </Stack>
-                <Box sx={{ mt: 1 }}>
-                  {result.key_takeaways.length === 0 ? (
-                    <Typography color="text.secondary">No key takeaways generated.</Typography>
-                  ) : (
+            <SummaryCard
+              title={result.title || "Video Title Not Available"}
+              channel={result.channel_name || "Channel Not Available"}
+              thumbnail={result.thumbnail_url || "/youtube.svg"}
+              summary={result.summary}
+            />
+
+            <Grid container spacing={3}>
+              <Grid item xs={12} md={6}>
+                <Card sx={{ background: '#e8f5e9', borderLeft: '6px solid #4caf50', borderRadius: 2, boxShadow: 3 }}>
+                  <CardContent>
+                    <Stack direction="row" alignItems="center" spacing={1} mb={1}>
+                      <LightbulbIcon color="success" />
+                      <Typography variant="h6" fontWeight={600} color="#388e3c">Key Takeaways</Typography>
+                    </Stack>
                     <Stack spacing={1}>
-                      {result.key_takeaways.map((takeaway, idx) => (
-                        <Box key={idx} sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
-                          <Chip label={idx + 1} size="small" sx={{ bgcolor: '#ffe066', color: '#b59f3b', fontWeight: 700, mr: 1 }} />
-                          <Typography variant="body1">{takeaway}</Typography>
+                      {result.key_takeaways.length === 0 ? (
+                        <Typography color="text.secondary">No key takeaways generated.</Typography>
+                      ) : (
+                        result.key_takeaways.map((takeaway, idx) => (
+                          <Box key={idx} sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+                            <Chip label={idx + 1} size="small" sx={{ bgcolor: '#4caf50', color: 'white', fontWeight: 700, mr: 1 }} />
+                            <Typography variant="body1">{takeaway}</Typography>
+                          </Box>
+                        ))
+                      )}
+                    </Stack>
+                  </CardContent>
+                </Card>
+              </Grid>
+
+              <Grid item xs={12} md={6}>
+                <Card sx={{ background: '#e3f2fd', borderLeft: '6px solid #2196f3', borderRadius: 2, boxShadow: 3 }}>
+                  <CardContent>
+                    <Stack direction="row" alignItems="center" spacing={1} mb={1}>
+                      <TagIcon color="primary" />
+                      <Typography variant="h6" fontWeight={600} color="#1976d2">Main Topics</Typography>
+                    </Stack>
+                    <Stack direction="row" spacing={1} flexWrap="wrap">
+                      {result.hashtags.length === 0 ? (
+                        <Typography color="text.secondary">No hashtags generated.</Typography>
+                      ) : (
+                        result.hashtags.map((tag, idx) => (
+                          <Chip key={idx} label={tag} color="primary" variant="outlined" sx={{ mb: 1 }} />
+                        ))
+                      )}
+                    </Stack>
+                  </CardContent>
+                </Card>
+              </Grid>
+
+              <Grid item xs={12} md={6}>
+                <Card sx={{ background: '#e1f5fe', borderLeft: '6px solid #03a9f4', borderRadius: 2, boxShadow: 3 }}>
+                  <CardContent>
+                    <Stack direction="row" alignItems="center" spacing={1} mb={1}>
+                      <TwitterIcon color="info" />
+                      <Typography variant="h6" fontWeight={600} color="#0288d1">Generated Tweets</Typography>
+                    </Stack>
+                    <Stack spacing={1}>
+                      {result.twitter_thread.length === 0 ? (
+                        <Typography color="text.secondary">No tweets generated.</Typography>
+                      ) : (
+                        result.twitter_thread.map((tweet, idx) => (
+                          <Card key={idx} sx={{ background: '#f5f5f5', borderLeft: '4px solid #9e9e9e', borderRadius: 1, boxShadow: 1 }}>
+                            <CardContent sx={{ py: '12px !important', px: '16px !important' }}>
+                              <Typography variant="body2">{tweet}</Typography>
+                            </CardContent>
+                          </Card>
+                        ))
+                      )}
+                    </Stack>
+                  </CardContent>
+                </Card>
+              </Grid>
+
+              <Grid item xs={12} md={6}>
+                <Card sx={{ background: '#f3e5f5', borderLeft: '6px solid #ab47bc', borderRadius: 2, boxShadow: 3 }}>
+                  <CardContent>
+                    <Stack direction="row" alignItems="center" spacing={1} justifyContent="space-between" mb={1}>
+                      <Typography variant="h6" fontWeight={600} color="#8e24aa">Full Transcript</Typography>
+                      <Button size="small" variant="outlined" onClick={() => {navigator.clipboard.writeText(result.transcript.map(t => t.text).join(' '))}} sx={{ color: '#8e24aa', borderColor: '#8e24aa' }}>Copy Transcript</Button>
+                    </Stack>
+                    <Box sx={{ mt: 1, maxHeight: 300, overflowY: 'auto', background: '#fff', p: 2, borderRadius: 1, fontSize: 14, fontFamily: 'monospace', whiteSpace: 'pre-wrap', boxShadow: 1 }}>
+                      {result.transcript.map((line, idx) => (
+                        <Box key={idx} sx={{ display: 'flex', gap: 1, alignItems: 'flex-start', mb: 0.5 }}>
+                          <Typography variant="caption" sx={{ color: '#ab47bc', minWidth: 40 }}>
+                            {new Date(line.start * 1000).toISOString().substr(14, 5)}
+                          </Typography>
+                          <Typography variant="body2">{line.text}</Typography>
                         </Box>
                       ))}
-                    </Stack>
-                  )}
-                </Box>
-              </CardContent>
-            </Card>
-            {/* Hashtags */}
-            <Card sx={{ mb: 3, background: '#e3f2fd', borderLeft: '6px solid #42a5f5' }}>
-              <CardContent>
-                <Stack direction="row" alignItems="center" spacing={1}>
-                  <TagIcon color="primary" />
-                  <Typography variant="h6" fontWeight={600} color="#1976d2">Main Topics</Typography>
-                </Stack>
-                <Box sx={{ mt: 1 }}>
-                  {result.hashtags.length === 0 ? (
-                    <Typography color="text.secondary">No hashtags generated.</Typography>
-                  ) : (
-                    <Stack direction="row" spacing={1} flexWrap="wrap">
-                      {result.hashtags.map((tag, idx) => (
-                        <Chip key={idx} label={tag} color="primary" variant="outlined" sx={{ mb: 1 }} />
-                      ))}
-                    </Stack>
-                  )}
-                </Box>
-              </CardContent>
-            </Card>
-            {/* Twitter Thread */}
-            <Typography variant="h6" fontWeight={600} color="#1976d2" sx={{ mb: 1, mt: 2 }}>
-              <TwitterIcon color="primary" sx={{ verticalAlign: 'middle', mr: 1 }} />Generated Tweets
-            </Typography>
-            <Stack spacing={2}>
-              {result.twitter_thread.length === 0 ? (
-                <Typography color="text.secondary">No tweets generated.</Typography>
-              ) : (
-                result.twitter_thread.map((tweet, idx) => (
-                  <Card key={idx} sx={{ background: '#e3f2fd', borderLeft: '6px solid #42a5f5' }}>
-                    <CardContent>
-                      <Stack direction="row" alignItems="center" spacing={1}>
-                        <TwitterIcon color="primary" />
-                        <Typography variant="subtitle2" color="text.secondary">Tweet {idx + 1}</Typography>
-                      </Stack>
-                      <Typography variant="body1" sx={{ mt: 1 }}>{tweet}</Typography>
-                    </CardContent>
-                  </Card>
-                ))
-              )}
-            </Stack>
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+            </Grid>
+            <Box sx={{ mt: 4 }}>
+              <FeedbackForm analysisId={result.id} onSubmit={handleFeedbackSubmit} />
+            </Box>
           </Box>
         )}
+
+        <Dialog open={upgradeModalOpen} onClose={() => setUpgradeModalOpen(false)}>
+          <DialogTitle>Upgrade to Pro</DialogTitle>
+          <DialogContent>
+            <DialogContentText>
+              You have exhausted your free credits for the month. Please upgrade to the Pro tier for unlimited access.
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setUpgradeModalOpen(false)}>Cancel</Button>
+            <Button onClick={handleUpgrade} variant="contained">Upgrade</Button>
+          </DialogActions>
+        </Dialog>
       </Container>
     </Box>
   );

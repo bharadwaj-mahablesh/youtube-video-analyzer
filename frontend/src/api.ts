@@ -1,18 +1,92 @@
+export interface TranscriptLine {
+  start: number;
+  text: string;
+}
+
 export interface AnalyzeResponse {
+  id: string; // UUID for the analysis
   summary: string;
   key_takeaways: string[];
   hashtags: string[];
   twitter_thread: string[];
+  transcript: TranscriptLine[];
+  title?: string;
+  channel_name?: string;
+  thumbnail_url?: string;
+  credits_remaining?: number; // Added for credit tracking
 }
 
-export async function analyzeVideo(youtube_url: string, provider: string = "ollama", openai_api_key?: string): Promise<AnalyzeResponse> {
-  const res = await fetch("http://localhost:8000/analyze", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ youtube_url, provider, openai_api_key }),
+export interface UserInfoResponse {
+  tier: string;
+  credits_remaining: number;
+}
+
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+
+export async function analyzeVideo(url: string, token: string): Promise<AnalyzeResponse> {
+  const response = await fetch(`${BACKEND_URL}/analyze`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify({ youtube_url: url }),
   });
-  if (!res.ok) {
-    throw new Error((await res.json()).detail || "Failed to analyze video");
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to analyze video');
   }
-  return res.json();
-} 
+
+  return response.json();
+}
+
+export async function submitFeedback(analysis_id: string, rating: number, comment: string, token: string): Promise<any> {
+    const response = await fetch(`${BACKEND_URL}/feedback`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ analysis_id, rating, comment }),
+    });
+
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to submit feedback');
+    }
+
+    return response.json();
+}
+
+export async function fetchUserInfo(token: string): Promise<UserInfoResponse> {
+    const response = await fetch(`${BACKEND_URL}/user_info`, {
+        method: 'GET',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+        },
+    });
+
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to fetch user info');
+    }
+
+    return response.json();
+}
+
+export async function upgradeToPro(token: string): Promise<any> {
+    const response = await fetch(`${BACKEND_URL}/upgrade`, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+        },
+    });
+
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to upgrade');
+    }
+
+    return response.json();
+}
