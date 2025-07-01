@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from 'react';
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { ClerkProvider } from '@clerk/nextjs';
@@ -22,8 +23,10 @@ export default function RootLayout({
     <ClerkProvider>
       <html lang="en">
         <body className={inter.className} style={{ background: '#f6f7fb', minHeight: '100vh' }}>
-          {children}
-        <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+          <Suspense fallback={<div>Loading...</div>}>
+            {children}
+          </Suspense>
+          <script src="https://checkout.razorpay.com/v1/checkout.js" async></script>
         </body>
       </html>
     </ClerkProvider>
