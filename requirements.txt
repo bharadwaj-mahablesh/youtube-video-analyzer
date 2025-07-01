@@ -5,4 +5,5 @@ httpx
 supabase
 openai
 yt-dlp
-razorpay 
+razorpay
+python-dotenv 
