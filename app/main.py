@@ -16,7 +16,7 @@ def health_check():
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # Or ["*"] for all origins (less secure)
+    allow_origins=os.environ.get("FRONTEND_URL", "http://localhost:3000").split(","),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
