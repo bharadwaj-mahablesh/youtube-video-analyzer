@@ -220,8 +220,8 @@ async def submit_feedback(request: FeedbackRequest, clerk_user: dict = Depends(g
     try:
         user = await get_or_create_user(clerk_user)
         supabase.table("analysis_feedback").insert({
-            "analysis_id": request.analysis_id,
-            "user_id": user["id"],
+            "analysis_id": str(request.analysis_id),
+            "user_id": str(user["id"]),
             "rating": request.rating,
             "comment": request.comment
         }).execute()
