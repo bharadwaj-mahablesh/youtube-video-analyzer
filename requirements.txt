@@ -8,3 +8,4 @@ yt-dlp
 razorpay
 python-dotenv
 python-jose[cryptography]
+setuptools
