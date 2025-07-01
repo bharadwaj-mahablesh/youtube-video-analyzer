@@ -6,4 +6,5 @@ supabase
 openai
 yt-dlp
 razorpay
-python-dotenv 
+python-dotenv
+python-jose[cryptography]
