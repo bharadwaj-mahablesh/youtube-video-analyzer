@@ -4,13 +4,15 @@ import { Container, Box, CircularProgress, Alert, Typography, Paper, Chip, Stack
 import InputForm from "../components/InputForm";
 import SummaryCard from "../components/SummaryCard";
 import FeedbackForm from "../components/FeedbackForm";
+import TopComments from "../components/TopComments";
 import TwitterIcon from '@mui/icons-material/Twitter';
 import LightbulbIcon from '@mui/icons-material/Lightbulb';
 import SummarizeIcon from '@mui/icons-material/Summarize';
 import TagIcon from '@mui/icons-material/Tag';
-import { analyzeVideo, submitFeedback, fetchUserInfo, upgradeToPro, AnalyzeResponse, UserInfoResponse } from "../api";
+import { analyzeVideo, submitFeedback, fetchUserInfo, upgradeToPro, createRazorpayOrder, AnalyzeResponse, UserInfoResponse } from "../api";
 import UserInfo from "../components/UserInfo";
 import { useUser, SignInButton, SignOutButton, useAuth } from '@clerk/nextjs';
+import { useRouter } from 'next/navigation';
 import YouTubeIcon from '@mui/icons-material/YouTube';
 import { Logout, Upgrade } from '@mui/icons-material';
 
@@ -21,6 +23,7 @@ const EXAMPLES = [
 
 export default function HomePage() {
   const { getToken } = useAuth();
+  const router = useRouter();
   const [result, setResult] = useState<AnalyzeResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -28,7 +31,9 @@ export default function HomePage() {
   const [userInfo, setUserInfo] = useState<UserInfoResponse>({ tier: 'free', credits_remaining: 0 });
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
+  const [upgradeReason, setUpgradeReason] = useState<"exhausted_credits" | "pro_tier_promo" | null>(null);
 
+  
 
   useEffect(() => {
     const getUserCredits = async () => {
@@ -45,13 +50,21 @@ export default function HomePage() {
       }
     };
     getUserCredits();
+
+    if (!isSignedIn) {
+      setAnchorEl(null);
+      setResult(null); // Clear analysis results on sign out
+    }
   }, [isSignedIn, getToken]);
 
   useEffect(() => {
-    if (!isSignedIn) {
-      setAnchorEl(null);
+    // Check for upgrade action in URL
+    if (router.isReady && router.query && router.query.action === 'upgrade' && isSignedIn) {
+      setUpgradeReason('pro_tier_promo');
+      setUpgradeModalOpen(true);
+      router.replace({ query: {} });
     }
-  }, [isSignedIn]);
+  }, [isSignedIn, router.isReady, router.query]);
 
   const handleMenuClick = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
@@ -65,18 +78,47 @@ export default function HomePage() {
     try {
       const token = await getToken();
       if (!token) throw new Error('Authentication failed');
-      await upgradeToPro(token);
-      const data = await fetchUserInfo(token);
-      setUserInfo(data);
-      setUpgradeModalOpen(false);
-      handleMenuClose();
+
+      const order = await createRazorpayOrder(token);
+
+      const options = {
+        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID, // Enter the Key ID generated from the Dashboard
+        amount: order.amount, // Amount is in currency subunits. Default currency is INR. Hence, 50000 means 50000 paise or ₹500.
+        currency: order.currency,
+        name: "YouTube Analyzer",
+        description: "Pro Tier Upgrade",
+        order_id: order.order_id, // Pass the `order_id` obtained in the previous step
+        handler: async function (response: any) {
+          // This function is called when the payment is successful
+          // You would typically verify the payment on your backend here
+          // For now, we'll just update the user's tier directly
+          await upgradeToPro(token);
+          const data = await fetchUserInfo(token);
+          setUserInfo(data);
+          setUpgradeModalOpen(false);
+          handleMenuClose();
+          alert("Upgrade successful!");
+        },
+        prefill: {
+          name: user?.fullName || "",
+          email: user?.primaryEmailAddress?.emailAddress || "",
+        },
+        theme: {
+          color: "#3f51b5",
+        },
+      };
+
+      const rzp = new (window as any).Razorpay(options);
+      rzp.open();
+
     } catch (err: any) {
-      setError(err.message || 'Failed to upgrade');
+      setError(err.message || 'Failed to initiate upgrade');
     }
   };
 
   const handleSubmit = async (url: string) => {
     if (userInfo.tier === 'free' && userInfo.credits_remaining <= 0) {
+      setUpgradeReason('exhausted_credits');
       setUpgradeModalOpen(true);
       return;
     }
@@ -110,35 +152,14 @@ export default function HomePage() {
 
   if (!isSignedIn) {
     return (
-      <Box
-        sx={{
-          minHeight: '100vh',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: 'linear-gradient(135deg, #e0f7fa 0%, #e8eaf6 100%)',
-          py: 4,
-        }}
-      >
-        <Card
-          sx={{
-            p: 5,
-            minWidth: { xs: '90%', sm: 400 },
-            borderRadius: 3,
-            boxShadow: '0px 10px 30px rgba(0, 0, 0, 0.1)',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: 3,
-            bgcolor: 'white',
-          }}
-        >
-          <YouTubeIcon sx={{ fontSize: 70, color: '#ff0000', mb: 1 }} />
-          <Typography variant="h4" fontWeight={700} color="#3f51b5" sx={{ fontFamily: 'Roboto, sans-serif', textAlign: 'center' }}>
+      <Box sx={{ flexGrow: 1, bgcolor: '#f0f2f5', py: 4 }}>
+        <Container maxWidth="lg" sx={{ textAlign: 'center' }}>
+          <YouTubeIcon sx={{ fontSize: 80, color: '#ff0000', mb: 2 }} />
+          <Typography variant="h3" component="h1" gutterBottom sx={{ fontWeight: 700, color: '#3f51b5' }}>
             YouTube Analyzer
           </Typography>
-          <Typography variant="subtitle1" color="text.secondary" sx={{ mb: 2, textAlign: 'center' }}>
-            Unlock video insights with AI-powered summaries and more.
+          <Typography variant="h6" color="text.secondary" paragraph>
+            Unlock the power of YouTube videos with AI-driven insights. Get instant summaries, key takeaways, relevant hashtags, and ready-to-share Twitter threads from any YouTube video.
           </Typography>
           <SignInButton mode="modal">
             <Button
@@ -146,19 +167,90 @@ export default function HomePage() {
               color="primary"
               size="large"
               sx={{
+                mt: 2,
                 borderRadius: 2,
                 fontWeight: 600,
-                fontSize: 16,
-                px: 4,
+                fontSize: 18,
+                px: 5,
                 py: 1.5,
-                boxShadow: '0px 4px 15px rgba(63, 81, 181, 0.3)',
+                boxShadow: '0px 6px 20px rgba(63, 81, 181, 0.4)',
                 textTransform: 'none',
               }}
             >
               Sign in to Get Started
             </Button>
           </SignInButton>
-        </Card>
+
+          <Grid container spacing={4} sx={{ mt: 6 }} justifyContent="center" alignItems="stretch">
+            {/* Pricing Tiers Section */}
+            <Grid item xs={12}>
+              <Typography variant="h4" gutterBottom sx={{ fontWeight: 700, color: '#3f51b5', mb: 3, textAlign: 'center' }}>
+                Pricing Tiers
+              </Typography>
+              <Grid container spacing={2} justifyContent="center" alignItems="stretch">
+                <Grid item xs={12} sm={6}>
+                  <Card sx={{ p: 3, borderRadius: 2, boxShadow: '0px 4px 15px rgba(0, 0, 0, 0.1)', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: 300, width: '100%' }}>
+                    <Box>
+                      <Typography variant="h5" gutterBottom sx={{ fontWeight: 700, color: '#4caf50' }}>
+                        Free Tier
+                      </Typography>
+                      <Typography variant="h4" gutterBottom sx={{ fontWeight: 700 }}>
+                        ₹0<Typography component="span" variant="h6" color="text.secondary">/month</Typography>
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        Perfect for casual users and trying out the service.
+                      </Typography>
+                      <Stack component="ul" sx={{ listStyle: 'none', p: 0, m: 0 }}>
+                        <Typography component="li" sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Chip label="5" size="small" color="primary" /> Analyses per month
+                        </Typography>
+                        <Typography component="li" sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                          Basic AI features
+                        </Typography>
+                      </Stack>
+                    </Box>
+                    <SignInButton mode="modal">
+                      <Button variant="outlined" color="primary" fullWidth sx={{ mt: 2, textTransform: 'none' }}>
+                        Start for Free
+                      </Button>
+                    </SignInButton>
+                  </Card>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <Card sx={{ p: 3, borderRadius: 2, boxShadow: '0px 4px 15px rgba(0, 0, 0, 0.1)', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: 300, width: '100%' }}>
+                    <Box>
+                      <Typography variant="h5" gutterBottom sx={{ fontWeight: 700, color: '#9c27b0' }}>
+                        Pro Tier
+                      </Typography>
+                      <Typography variant="h4" gutterBottom sx={{ fontWeight: 700 }}>
+                        ₹99<Typography component="span" variant="h6" color="text.secondary">/month</Typography>
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        For power users who need unlimited access and advanced features.
+                      </Typography>
+                      <Stack component="ul" sx={{ listStyle: 'none', p: 0, m: 0 }}>
+                        <Typography component="li" sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Chip label="Unlimited" size="small" color="secondary" /> Analyses
+                        </Typography>
+                        <Typography component="li" sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                          Priority support
+                        </Typography>
+                        <Typography component="li" sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                          Early access to new features
+                        </Typography>
+                      </Stack>
+                    </Box>
+                    <SignInButton mode="modal" redirectUrl="/?action=upgrade">
+                      <Button variant="contained" color="secondary" fullWidth sx={{ mt: 2, textTransform: 'none' }}>
+                        Upgrade Now
+                      </Button>
+                    </SignInButton>
+                  </Card>
+                </Grid>
+              </Grid>
+            </Grid>
+          </Grid>
+        </Container>
       </Box>
     );
   }
@@ -346,6 +438,9 @@ export default function HomePage() {
               </Grid>
             </Grid>
             <Box sx={{ mt: 4 }}>
+              <TopComments comments={result.top_comments || []} />
+            </Box>
+            <Box sx={{ mt: 4 }}>
               <FeedbackForm analysisId={result.id} onSubmit={handleFeedbackSubmit} />
             </Box>
           </Box>
@@ -355,7 +450,9 @@ export default function HomePage() {
           <DialogTitle>Upgrade to Pro</DialogTitle>
           <DialogContent>
             <DialogContentText>
-              You have exhausted your free credits for the month. Please upgrade to the Pro tier for unlimited access.
+              {upgradeReason === 'exhausted_credits'
+                ? "You have exhausted your free credits for the month. Please upgrade to the Pro tier for unlimited access."
+                : "Upgrade to the Pro tier for unlimited access and advanced features!"}
             </DialogContentText>
           </DialogContent>
           <DialogActions>

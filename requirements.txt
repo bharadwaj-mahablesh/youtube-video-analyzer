@@ -2,6 +2,7 @@ fastapi
 uvicorn
 youtube-transcript-api
 httpx
-# supabase-py  # Uncomment when integrating Supabase 
+supabase-py
 openai
-yt-dlp 
+yt-dlp
+razorpay 

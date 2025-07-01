@@ -9,6 +9,12 @@ class TranscriptLine(BaseModel):
     start: float
     text: str
 
+class Comment(BaseModel):
+    text: str
+    author: str
+    like_count: int
+    timestamp: int
+
 class AnalyzeResponse(BaseModel):
     id: uuid.UUID
     summary: str
@@ -21,8 +27,10 @@ class AnalyzeResponse(BaseModel):
     channel_name: Optional[str] = None
     thumbnail_url: Optional[str] = None
     credits_remaining: Optional[int] = None # Added for credit tracking
+    top_comments: List[Comment] = []
 
 class FeedbackRequest(BaseModel):
     analysis_id: uuid.UUID
     rating: int = Field(..., ge=1, le=5)
     comment: Optional[str] = None
+

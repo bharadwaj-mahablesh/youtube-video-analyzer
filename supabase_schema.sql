@@ -65,3 +65,7 @@ CREATE TABLE IF NOT EXISTS analysis_feedback (
 -- Indexes for faster lookups
 CREATE INDEX IF NOT EXISTS idx_user_usage_user_id ON user_usage(user_id);
 CREATE INDEX IF NOT EXISTS idx_feedback_analysis_id ON analysis_feedback(analysis_id);
+
+-- Add top_comments column to video_analysis table
+ALTER TABLE video_analysis
+ADD COLUMN top_comments JSONB DEFAULT '[]'::jsonb;

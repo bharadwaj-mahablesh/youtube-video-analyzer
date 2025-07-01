@@ -1,8 +1,10 @@
 from fastapi import APIRouter, HTTPException, Request, Depends
+import stripe
 from app.schemas.models import AnalyzeRequest, AnalyzeResponse, FeedbackRequest
 from app.services.transcript import TranscriptService
 from app.services.llm import LLMService
 from app.services.video_metadata import fetch_video_metadata
+from app.services.comments import CommentsService
 from app.utils.logger import logger
 from app.services.supabase_client import supabase
 from jose import jwt
@@ -11,11 +13,17 @@ import re
 import os
 import uuid
 from datetime import datetime, timedelta, timezone
+import razorpay
 
 router = APIRouter()
 
 CLERK_JWT_ISSUER = os.getenv("CLERK_JWT_ISSUER", "https://clerk.com/")
 CLERK_JWT_PUBLIC_KEY = os.getenv("CLERK_JWT_PUBLIC_KEY")
+
+RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID")
+RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET")
+
+razorpay_client = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET))
 
 # Helper to get Clerk user from JWT
 def get_clerk_user(request: Request):
@@ -30,6 +38,29 @@ def get_clerk_user(request: Request):
         return payload
     except Exception as e:
         raise HTTPException(status_code=401, detail=f"Invalid Clerk token: {e}")
+
+@router.post("/create-razorpay-order")
+async def create_razorpay_order(clerk_user: dict = Depends(get_clerk_user)):
+    try:
+        user = await get_or_create_user(clerk_user)
+        amount = 9900  # Amount in paisa (e.g., 9900 paisa = 99 INR)
+        currency = "INR"
+
+        order_receipt = f"order_{uuid.uuid4().hex[:20]}"
+
+        order = razorpay_client.order.create({
+            "amount": amount,
+            "currency": currency,
+            "receipt": order_receipt,
+            "payment_capture": 1,  # Auto capture payment
+            "notes": {
+                "user_id": str(user['id'])
+            }
+        })
+        return {"order_id": order['id'], "amount": amount, "currency": currency}
+    except Exception as e:
+        logger.error(f"Error creating Razorpay order: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 def clean_section(text: str) -> str:
     text = re.sub(r"^(here (is|are)\b[^:]*:|summary:|tweet:?|key takeaway:?|takeaway:?|hashtags?:?)", "", text, flags=re.IGNORECASE).strip()
@@ -130,6 +161,8 @@ async def analyze_video(request: AnalyzeRequest, clerk_user: dict = Depends(get_
             LLMService.generate_content(thread_prompt),
         )
 
+        top_comments = CommentsService.fetch_top_comments(request.youtube_url)
+
         summary = clean_section(summary_resp)
         key_takeaways = [clean_section(t) for t in re.split(r'^(?:\d+\.\s*|[-•*]\s*)', takeaways_resp, flags=re.MULTILINE) if clean_section(t)][:5]
         hashtags = [h for h in hashtags_resp.replace(',', ' ').split() if h.startswith('#')][:5]
@@ -143,7 +176,8 @@ async def analyze_video(request: AnalyzeRequest, clerk_user: dict = Depends(get_
             "key_takeaways": key_takeaways,
             "hashtags": hashtags,
             "twitter_thread": twitter_thread,
-            "transcript": transcript
+            "transcript": transcript,
+            "top_comments": top_comments
         }).execute()
         analysis = analysis_insert.data[0]
 

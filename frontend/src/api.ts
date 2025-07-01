@@ -3,6 +3,13 @@ export interface TranscriptLine {
   text: string;
 }
 
+export interface Comment {
+  text: string;
+  author: string;
+  like_count: number;
+  timestamp: number;
+}
+
 export interface AnalyzeResponse {
   id: string; // UUID for the analysis
   summary: string;
@@ -14,6 +21,7 @@ export interface AnalyzeResponse {
   channel_name?: string;
   thumbnail_url?: string;
   credits_remaining?: number; // Added for credit tracking
+  top_comments?: Comment[];
 }
 
 export interface UserInfoResponse {
@@ -90,3 +98,37 @@ export async function upgradeToPro(token: string): Promise<any> {
 
     return response.json();
 }
+
+export async function createRazorpayOrder(token: string): Promise<{ order_id: string; amount: number; currency: string }> {
+    const response = await fetch(`${BACKEND_URL}/create-razorpay-order`, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+        },
+    });
+
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to create Razorpay order');
+    }
+
+    return response.json();
+}
+
+// export async function createCheckoutSession(token: string, successUrl: string, cancelUrl: string): Promise<{ url: string }> {
+//     const response = await fetch(`${BACKEND_URL}/create-checkout-session`, {
+//         method: 'POST',
+//         headers: {
+//             'Content-Type': 'application/json',
+//             'Authorization': `Bearer ${token}`,
+//         },
+//         body: JSON.stringify({ success_url: successUrl, cancel_url: cancelUrl }),
+//     });
+// 
+//     if (!response.ok) {
+//         const error = await response.json();
+//         throw new Error(error.detail || 'Failed to create checkout session');
+//     }
+// 
+//     return response.json();
+// }
