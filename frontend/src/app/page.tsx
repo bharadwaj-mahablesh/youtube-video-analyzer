@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { Container, Box, CircularProgress, Alert, Typography, Paper, Chip, Stack, Card, CardContent, Button, Link, Grid, Avatar, Menu, MenuItem, ListItemIcon, ListItemText, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from "@mui/material";
+import { Container, Box, CircularProgress, Alert, Typography, Paper, Chip, Stack, Card, CardContent, Button, Link, GridLegacy as Grid, Avatar, Menu, MenuItem, ListItemIcon, ListItemText, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from "@mui/material";
 import InputForm from "../components/InputForm";
 import SummaryCard from "../components/SummaryCard";
 import FeedbackForm from "../components/FeedbackForm";
@@ -12,7 +12,7 @@ import TagIcon from '@mui/icons-material/Tag';
 import { analyzeVideo, submitFeedback, fetchUserInfo, upgradeToPro, createRazorpayOrder, AnalyzeResponse, UserInfoResponse } from "../api";
 import UserInfo from "../components/UserInfo";
 import { useUser, SignInButton, SignOutButton, useAuth } from '@clerk/nextjs';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import YouTubeIcon from '@mui/icons-material/YouTube';
 import { Logout, Upgrade } from '@mui/icons-material';
 
@@ -24,6 +24,8 @@ const EXAMPLES = [
 export default function HomePage() {
   const { getToken } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const action = searchParams.get('action');
   const [result, setResult] = useState<AnalyzeResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -58,13 +60,12 @@ export default function HomePage() {
   }, [isSignedIn, getToken]);
 
   useEffect(() => {
-    // Check for upgrade action in URL
-    if (router.isReady && router.query && router.query.action === 'upgrade' && isSignedIn) {
+    if (action === 'upgrade' && isSignedIn) {
       setUpgradeReason('pro_tier_promo');
       setUpgradeModalOpen(true);
-      router.replace({ query: {} });
+      router.replace(window.location.pathname);
     }
-  }, [isSignedIn, router.isReady, router.query]);
+  }, [isSignedIn, action, router]);
 
   const handleMenuClick = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
@@ -240,7 +241,7 @@ export default function HomePage() {
                         </Typography>
                       </Stack>
                     </Box>
-                    <SignInButton mode="modal" redirectUrl="/?action=upgrade">
+                    <SignInButton mode="modal" forceRedirectUrl="/?action=upgrade">
                       <Button variant="contained" color="secondary" fullWidth sx={{ mt: 2, textTransform: 'none' }}>
                         Upgrade Now
                       </Button>
