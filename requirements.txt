@@ -2,7 +2,7 @@ fastapi
 uvicorn
 youtube-transcript-api
 httpx
-supabase-py
+supabase
 openai
 yt-dlp
 razorpay 
