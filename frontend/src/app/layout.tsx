@@ -9,7 +9,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "YouTube Analyzer",
+  title: "YouTube Video Insights",
   description: "AI-powered YouTube video analysis",
 };
 

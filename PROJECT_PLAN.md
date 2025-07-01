@@ -1,4 +1,4 @@
-# YouTube Analyzer: Project Plan
+# YouTube Video Insights: Project Plan
 
 ## Overview
 An AI-powered application that:

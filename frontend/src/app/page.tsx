@@ -85,7 +85,7 @@ export default function HomePage() {
         key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID, // Enter the Key ID generated from the Dashboard
         amount: order.amount, // Amount is in currency subunits. Default currency is INR. Hence, 50000 means 50000 paise or ₹500.
         currency: order.currency,
-        name: "YouTube Analyzer",
+        name: "YouTube Video Insights",
         description: "Pro Tier Upgrade",
         order_id: order.order_id, // Pass the `order_id` obtained in the previous step
         handler: async function (response: any) {
@@ -156,7 +156,7 @@ export default function HomePage() {
         <Container maxWidth="lg" sx={{ textAlign: 'center' }}>
           <YouTubeIcon sx={{ fontSize: 80, color: '#ff0000', mb: 2 }} />
           <Typography variant="h3" component="h1" gutterBottom sx={{ fontWeight: 700, color: '#3f51b5' }}>
-            YouTube Analyzer
+            YouTube Video Insights
           </Typography>
           <Typography variant="h6" color="text.secondary" paragraph>
             Unlock the power of YouTube videos with AI-driven insights. Get instant summaries, key takeaways, relevant hashtags, and ready-to-share Twitter threads from any YouTube video.
@@ -272,7 +272,7 @@ export default function HomePage() {
             <Stack direction="row" alignItems="center" spacing={2}>
               <img src="/youtube.svg" alt="YouTube" width={35} height={35} />
               <Typography variant="h5" fontWeight={700}>
-                YouTube Analyzer
+                YouTube Video Insights
               </Typography>
             </Stack>
             <Stack direction="row" alignItems="center" spacing={2}>
